@@ -11,7 +11,6 @@
 #include "Application.h"
 #include "Style.h"
 
-#include "serial.hpp"
 
 int main(void) 
 {
@@ -54,21 +53,6 @@ int main(void)
     ImFont *pFont = io.Fonts->AddFontFromFileTTF("..\\fonts\\Jetbrains.ttf",24);
     /* *********************************************************************/
 
-    serial_handle comm{"COM3", baud_rate_e::BAUDRATE_9600};
-
-    if (comm.open_connection() == 0){
-        printf("Connection Open\n");
-    }else{
-        printf("Connection Failed\n");
-    }
-    bool success_flag = false;
-
-    std::vector<std::string> ports = comm.get_available_ports();
-
-    for (const auto& port : ports) {
-        std::cout << port << std::endl;
-    }
-
     // Main loop
     while (!glfwWindowShouldClose(window)) 
     {
@@ -80,7 +64,7 @@ int main(void)
         ImGui::NewFrame();
         ImGui::PushFont(pFont);
         
-        MyApp::RenderUI(window, &comm);
+        MyApp::RenderUI(window);
         ImGui::ShowDemoWindow();
 
         /* *************************************************************************************** */
@@ -99,7 +83,6 @@ int main(void)
     }
 
     // Cleanup
-    comm.close_connection();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();

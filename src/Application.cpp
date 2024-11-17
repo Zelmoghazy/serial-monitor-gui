@@ -264,7 +264,7 @@ namespace MyApp
         ImGui::Text("Binary: %s", binaryOutput.c_str());
     }
 
-    void RenderUI(GLFWwindow* window, serial_handle *comm)
+    void RenderUI(GLFWwindow* window)
     {
         /* Variables */
         static bool checkboxval = false;
@@ -288,6 +288,12 @@ namespace MyApp
         static ImGuiTextBuffer log;
         static ImGuiTextFilter filter;
         static ImVector<int>   line_off; // Index to lines offset. We maintain this with AddLog() calls.
+
+        static serial_handle comm{"COM3", baud_rate_e::BAUDRATE_9600};
+        static std::vector<std::string> ports = comm.get_available_ports();
+        
+        static bool success_flag = false;
+
 
         static char temp_line[1024];
         static int temp_line_idx = 0;
@@ -315,7 +321,7 @@ namespace MyApp
         bool p_open;
 
         ImGui::Begin("Utilities", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
-
+        {
             static char buf3[32] = ""; 
             ImGui::InputText("hexadecimal", buf3, 32, ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_CharsUppercase);
 
@@ -339,7 +345,7 @@ namespace MyApp
 
             HexConverterWindow(buf3);
 
-/*             if (ImGui::TreeNode("Other"))
+        /* if (ImGui::TreeNode("Other"))
             {
                 ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
                 if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags))
@@ -396,6 +402,7 @@ namespace MyApp
                 sprintf(overlay, "avg %f", average);
                 ImGui::PlotLines("Lines", values, IM_ARRAYSIZE(values), values_offset, overlay, -1.0f, 1.0f, ImVec2(0, 80.0f));
             }
+        }
         ImGui::End();
 
         ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
@@ -406,12 +413,36 @@ namespace MyApp
         }
         if (ImGui::CollapsingHeader("Configuration", ImGuiTreeNodeFlags_None))
         {
-
+            if(ImGui::Button("Reload"))
+            {
+                ports = comm.get_available_ports();
+                for (const auto& port : ports) {
+                    std::cout << port << std::endl;
+                }
+            }
+            
             static ImGuiComboFlags flags = 0;
             flags &= ~ImGuiComboFlags_NoPreview;
 
-            static int baudrate_current_idx = 0; // Here we store our selection data as an index.
-            const char* baudrate_preview_value = BAUD_RATE_STRINGS[baudrate_current_idx];  // Pass in the preview value visible before opening the combo (it could be anything)
+            static int port_current_idx = 0; 
+            const char* port_preview_value = ports[port_current_idx].c_str();
+            if (ImGui::BeginCombo("Port", port_preview_value, flags))
+            {
+                for (int n = 0; n < ports.size(); n++)
+                {
+                    const bool is_selected = (port_current_idx == n);
+                    if (ImGui::Selectable(ports[n].c_str(), is_selected))
+                        port_current_idx = n;
+
+                    // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                    if (is_selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            static int baudrate_current_idx = 0; 
+            const char* baudrate_preview_value = BAUD_RATE_STRINGS[baudrate_current_idx];
             if (ImGui::BeginCombo("Baudrate", baudrate_preview_value, flags))
             {
                 for (int n = 0; n < static_cast<int>(baud_rate_e::BAUDRATE_COUNT); n++)
@@ -477,6 +508,20 @@ namespace MyApp
                 }
                 ImGui::EndCombo();
             }
+
+            if(ImGui::Button("Connect"))
+            {
+                if(comm.is_connection_open()){
+                    comm.close_connection();
+                }
+                comm = serial_handle(ports[port_current_idx], static_cast<baud_rate_e>(baudrate_current_idx), static_cast<data_e>(data_current_idx), static_cast<parity_e>(parity_current_idx), static_cast<stop_bits_e>(stop_current_idx), false);
+
+                if (comm.open_connection() == 0){
+                    printf("Connection Open\n");
+                }else{
+                    printf("Connection Failed\n");
+                }
+            }
         }
         {
             ImGui::SeparatorText("Console");
@@ -497,8 +542,7 @@ namespace MyApp
             }
             ImGui::SameLine();
 
-            bool success_flag = false;
-            char ch = comm->read_char(success_flag);
+            char ch = comm.read_char(success_flag);
 
 
             ImGui::Checkbox("Auto-scroll", &AutoScroll);

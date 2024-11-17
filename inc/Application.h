@@ -4,5 +4,5 @@
 
 namespace MyApp
 {
-    void RenderUI(GLFWwindow* window, serial_handle *comm);
+    void RenderUI(GLFWwindow* window);
 }
