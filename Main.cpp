@@ -10,11 +10,15 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "implot.h"
 #include "Application.h"
 #include "Style.h"
 
-#include <Windows.h>
-#include <dwmapi.h>
+#ifdef _WIN32
+    #include <uxtheme.h>
+    #include <windows.h>
+    #include <dwmapi.h>
+#endif
 
 double s_xpos = 0, s_ypos = 0;
 int w_xsiz = 0, w_ysiz = 0;
@@ -83,11 +87,21 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             RECT windowRect;
             GetClientRect(hWnd, &windowRect);
             
-            if (clientMousePos.y >= windowRect.top && clientMousePos.y < windowRect.top + 32)
+            // Calculate window width
+            int windowWidth = windowRect.right - windowRect.left;
+            
+            // Define middle draggable area
+            int dragAreaWidth = 200;  // Adjust this value to your needs
+            int dragAreaLeft = (windowWidth - dragAreaWidth) / 2;
+            int dragAreaRight = dragAreaLeft + dragAreaWidth;
+            
+            if (clientMousePos.y >= windowRect.top && clientMousePos.y < windowRect.top + 32 &&
+                clientMousePos.x >= windowRect.left + dragAreaLeft && 
+                clientMousePos.x <= windowRect.left + dragAreaRight)
             {
                 return HTCAPTION;
             }
-
+            
             if (clientMousePos.y >= windowRect.bottom - borderWidth)
             {
                 if (clientMousePos.x <= borderWidth)
@@ -142,6 +156,15 @@ void disableTitlebar(GLFWwindow* window)
 #endif
 }
 
+void DarkTitleBar(GLFWwindow* window)
+{
+    HWND hwnd = glfwGetWin32Window(window);
+    BOOL value = TRUE;
+    DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
+    SetWindowTheme(hwnd, L"DarkMode_Explorer", NULL);
+    SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+}
+
 int main(void) 
 {
     if (!glfwInit()) 
@@ -155,7 +178,8 @@ int main(void)
         return -1;
     }
 
-    disableTitlebar(window);
+    // disableTitlebar(window);
+    DarkTitleBar(window);
 
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
@@ -167,6 +191,8 @@ int main(void)
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    ImPlot::CreateContext();
+
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
@@ -205,6 +231,7 @@ int main(void)
         
         MyApp::RenderUI(window);
         ImGui::ShowDemoWindow();
+        ImPlot::ShowDemoWindow();
 
         /* *************************************************************************************** */
 
@@ -225,6 +252,8 @@ int main(void)
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
+
+    ImPlot::DestroyContext();
     ImGui::DestroyContext();
 
     glfwDestroyWindow(window);
